@@ -1,12 +1,13 @@
 use std::io::{self, Write};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 use crate::cmd::{Query, Run};
 use crate::config;
-use crate::db::{Database, Epoch, Stream};
+use crate::db::{Database, Epoch, Stream, DirItem};
 use crate::error::BrokenPipeHandler;
-use crate::util::{self, Fzf, FzfChild};
+use crate::util::current_time;
+use skim::prelude::*;
 
 impl Run for Query {
     fn run(&self) -> Result<()> {
@@ -14,30 +15,57 @@ impl Run for Query {
         self.query(&mut db).and(db.save())
     }
 }
+                // // Search mode
+                // "--exact",
+                // // Search result
+                // "--no-sort",
+                // // Interface
+                // "--bind=ctrl-z:ignore,btab:up,tab:down",
+                // "--cycle",
+                // "--keep-right",
+                // // Layout
+                // "--border=sharp", // rounded edges don't display correctly on some terminals
+                // "--height=45%",
+                // "--info=inline",
+                // "--layout=reverse",
+                // // Display
+                // "--tabstop=1",
+                // // Scripting
+                // "--exit-0",
+                // "--select-1",
 
 impl Query {
     fn query(&self, db: &mut Database) -> Result<()> {
-        let now = util::current_time()?;
+        let now = current_time()?;
         let mut stream = self.get_stream(db, now);
 
         if self.interactive {
-            let mut fzf = Self::get_fzf()?;
-            let selection = loop {
-                match stream.next() {
-                    Some(dir) => {
-                        if let Some(selection) = fzf.write(dir, now)? {
-                            break selection;
-                        }
-                    }
-                    None => break fzf.wait()?,
-                }
-            };
+            let (tx_item, rx_item): (SkimItemSender, SkimItemReceiver) = unbounded();
+            let options = SkimOptionsBuilder::default()
+                .height(Some("45%"))
+                .multi(false)
+                .preview(Some("command -p ls -Cp --color=always --group-directories-first {}"))
+                .build()
+                .unwrap();
+            
+            while let Some(dir) = stream.next() {
+                let _ = tx_item.send(Arc::new(DirItem::from(dir)));
+            }
+            drop(tx_item);
 
-            if self.score {
-                print!("{selection}");
-            } else {
-                let path = selection.get(7..).context("could not read selection from fzf")?;
-                print!("{path}");
+            let selection = Skim::run_with(&options, Some(rx_item))
+                .map(|out| out.selected_items)
+                .unwrap_or_else(Vec::new);
+//            dbg!(selection);
+            if let Some(selection) = selection.get(0) {
+//                dbg!(selection);
+                if let Some(selection) = selection.as_any().downcast_ref::<DirItem>() {
+                    if self.score {
+                        print!("{} {}", selection.rank, selection.path);
+                    } else {
+                        print!("{}", selection.path);
+                    }
+                } 
             }
         } else if self.list {
             let handle = &mut io::stdout().lock();
@@ -71,35 +99,5 @@ impl Query {
             stream = stream.with_exclude(path);
         }
         stream
-    }
-
-    fn get_fzf() -> Result<FzfChild> {
-        let mut fzf = Fzf::new()?;
-        if let Some(fzf_opts) = config::fzf_opts() {
-            fzf.env("FZF_DEFAULT_OPTS", fzf_opts)
-        } else {
-            fzf.args([
-                // Search mode
-                "--exact",
-                // Search result
-                "--no-sort",
-                // Interface
-                "--bind=ctrl-z:ignore,btab:up,tab:down",
-                "--cycle",
-                "--keep-right",
-                // Layout
-                "--border=sharp", // rounded edges don't display correctly on some terminals
-                "--height=45%",
-                "--info=inline",
-                "--layout=reverse",
-                // Display
-                "--tabstop=1",
-                // Scripting
-                "--exit-0",
-                "--select-1",
-            ])
-            .enable_preview()
-        }
-        .spawn()
     }
 }

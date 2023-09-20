@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use bincode::Options;
 use ouroboros::self_referencing;
 
-pub use crate::db::dir::{Dir, Epoch, Rank};
+pub use crate::db::dir::{Dir, Epoch, Rank, DirItem};
 pub use crate::db::stream::Stream;
 use crate::{config, util};
 

@@ -33,17 +33,17 @@ impl Fzf {
         #[cfg(windows)]
         let program = which::which("fzf.exe").map_err(|_| anyhow!(Self::ERR_FZF_NOT_FOUND))?;
         #[cfg(not(windows))]
-        let program = "fzf";
+        let program = "cat";
 
         // TODO: check version of fzf here.
 
         let mut cmd = Command::new(program);
-        cmd.args([
-            // Search mode
-            "--delimiter=\t",
-            "--nth=2",
-            // Scripting
-            "--read0",
+        cmd.args([ "--"
+            // // Search mode
+            // "--delimiter=\t",
+            // "--nth=2",
+            // // Scripting
+            // "--read0",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped());
