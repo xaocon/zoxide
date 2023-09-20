@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::fmt::{self, Display, Formatter};
 
 use serde::{Deserialize, Serialize};
+use skim::prelude::*;
 
 use crate::util::{DAY, HOUR, WEEK};
-use skim::prelude::*;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Dir<'a> {
@@ -75,14 +75,10 @@ pub struct DirItem {
     pub rank: Rank,
 }
 
-impl SkimItem for DirItem  {
+impl SkimItem for DirItem {
     fn text(&self) -> Cow<str> {
         Cow::Borrowed(&self.path)
     }
-
-    // fn preview(&self, _context: PreviewContext) -> ItemPreview {
-    //     ItemPreview::Text(format!("{:>5}  {}", self.rank, self.path))
-    // }
 
     fn display<'a>(&'a self, _context: DisplayContext<'a>) -> AnsiString<'a> {
         AnsiString::parse(&format!("{:>5}  {}", self.rank, self.path))
@@ -91,9 +87,6 @@ impl SkimItem for DirItem  {
 
 impl From<&Dir<'_>> for DirItem {
     fn from(dir: &Dir) -> Self {
-        Self {
-            path: dir.path.to_string(),
-            rank: dir.rank,
-        }
+        Self { path: dir.path.to_string(), rank: dir.rank }
     }
 }

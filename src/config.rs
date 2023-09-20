@@ -1,5 +1,4 @@
 use std::env;
-use std::ffi::OsString;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -39,10 +38,6 @@ pub fn exclude_dirs() -> Result<Vec<Pattern>> {
             Ok(pattern.into_iter().collect())
         }
     }
-}
-
-pub fn fzf_opts() -> Option<OsString> {
-    env::var_os("_ZO_FZF_OPTS")
 }
 
 pub fn maxage() -> Result<Rank> {

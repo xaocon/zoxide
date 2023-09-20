@@ -221,4 +221,4 @@ _zoxide() {
     esac
 }
 
-complete -F _zoxide -o bashdefault -o default zoxide
+complete -F _zoxide -o nosort -o bashdefault -o default zoxide

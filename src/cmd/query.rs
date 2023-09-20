@@ -1,13 +1,13 @@
 use std::io::{self, Write};
 
 use anyhow::{bail, Result};
+use skim::prelude::*;
 
 use crate::cmd::{Query, Run};
 use crate::config;
-use crate::db::{Database, Epoch, Stream, DirItem};
+use crate::db::{Database, DirItem, Epoch, Stream};
 use crate::error::BrokenPipeHandler;
 use crate::util::current_time;
-use skim::prelude::*;
 
 impl Run for Query {
     fn run(&self) -> Result<()> {
@@ -15,24 +15,24 @@ impl Run for Query {
         self.query(&mut db).and(db.save())
     }
 }
-                // // Search mode
-                // "--exact",
-                // // Search result
-                // "--no-sort",
-                // // Interface
-                // "--bind=ctrl-z:ignore,btab:up,tab:down",
-                // "--cycle",
-                // "--keep-right",
-                // // Layout
-                // "--border=sharp", // rounded edges don't display correctly on some terminals
-                // "--height=45%",
-                // "--info=inline",
-                // "--layout=reverse",
-                // // Display
-                // "--tabstop=1",
-                // // Scripting
-                // "--exit-0",
-                // "--select-1",
+// // Search mode
+// "--exact",
+// // Search result
+// "--no-sort",
+// // Interface
+// "--bind=ctrl-z:ignore,btab:up,tab:down",
+// "--cycle",
+// "--keep-right",
+// // Layout
+// "--border=sharp", // rounded edges don't display correctly on some terminals
+// "--height=45%",
+// "--info=inline",
+// "--layout=reverse",
+// // Display
+// "--tabstop=1",
+// // Scripting
+// "--exit-0",
+// "--select-1",
 
 impl Query {
     fn query(&self, db: &mut Database) -> Result<()> {
@@ -44,28 +44,34 @@ impl Query {
             let options = SkimOptionsBuilder::default()
                 .height(Some("45%"))
                 .multi(false)
-                .preview(Some("command -p ls -Cp --color=always --group-directories-first {}"))
+                // .preview(Some("command -p ls -Cp --color=always --group-directories-first {}"))
+                .preview(Some("command -p ls -Cp --color=always {}"))
+                // .no_clear(true)
+                // .no_clear_start(true)
                 .build()
                 .unwrap();
-            
+
             while let Some(dir) = stream.next() {
-                let _ = tx_item.send(Arc::new(DirItem::from(dir)));
+                let ddd = DirItem::from(dir);
+                let _ = tx_item.send(Arc::new(ddd));
             }
             drop(tx_item);
 
-            let selection = Skim::run_with(&options, Some(rx_item))
+            let selected_items = Skim::run_with(&options, Some(rx_item))
                 .map(|out| out.selected_items)
-                .unwrap_or_else(Vec::new);
-//            dbg!(selection);
-            if let Some(selection) = selection.get(0) {
-//                dbg!(selection);
-                if let Some(selection) = selection.as_any().downcast_ref::<DirItem>() {
-                    if self.score {
-                        print!("{} {}", selection.rank, selection.path);
-                    } else {
-                        print!("{}", selection.path);
-                    }
-                } 
+                .unwrap_or_default()
+                .iter()
+                .map(|selected_item| {
+                    (**selected_item).as_any().downcast_ref::<DirItem>().unwrap().to_owned()
+                })
+                .collect::<Vec<DirItem>>();
+
+            if let Some(selection) = selected_items.get(0) {
+                if self.score {
+                    print!("{} {}", selection.rank, selection.path);
+                } else {
+                    print!("{}", selection.path);
+                }
             }
         } else if self.list {
             let handle = &mut io::stdout().lock();

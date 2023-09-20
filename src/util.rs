@@ -10,7 +10,7 @@ use std::{env, mem};
 use anyhow::anyhow;
 use anyhow::{bail, Context, Result};
 
-use crate::db::{Dir, Epoch};
+use crate::db::Epoch;
 use crate::error::SilentExit;
 
 pub const SECOND: Epoch = 1;
@@ -23,7 +23,7 @@ pub const MONTH: Epoch = 30 * DAY;
 pub struct Fzf(Command);
 
 impl Fzf {
-    const ERR_FZF_NOT_FOUND: &str = "could not find fzf, is it installed?";
+    const ERR_FZF_NOT_FOUND: &'static str = "could not find fzf, is it installed?";
 
     pub fn new() -> Result<Self> {
         // On Windows, CreateProcess implicitly searches the current working
@@ -33,17 +33,17 @@ impl Fzf {
         #[cfg(windows)]
         let program = which::which("fzf.exe").map_err(|_| anyhow!(Self::ERR_FZF_NOT_FOUND))?;
         #[cfg(not(windows))]
-        let program = "cat";
+        let program = "fzf";
 
         // TODO: check version of fzf here.
 
         let mut cmd = Command::new(program);
-        cmd.args([ "--"
-            // // Search mode
-            // "--delimiter=\t",
-            // "--nth=2",
-            // // Scripting
-            // "--read0",
+        cmd.args([
+            // Search mode
+            "--delimiter=\t",
+            "--nth=2",
+            // Scripting
+            "--read0",
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped());
@@ -90,15 +90,6 @@ impl Fzf {
         self
     }
 
-    pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Self
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        self.0.env(key, val);
-        self
-    }
-
     pub fn envs<I, K, V>(&mut self, vars: I) -> &mut Self
     where
         I: IntoIterator<Item = (K, V)>,
@@ -121,15 +112,6 @@ impl Fzf {
 pub struct FzfChild(Child);
 
 impl FzfChild {
-    pub fn write(&mut self, dir: &Dir, now: Epoch) -> Result<Option<String>> {
-        let handle = self.0.stdin.as_mut().unwrap();
-        match write!(handle, "{}\0", dir.display().with_score(now).with_separator('\t')) {
-            Ok(()) => Ok(None),
-            Err(e) if e.kind() == io::ErrorKind::BrokenPipe => self.wait().map(Some),
-            Err(e) => Err(e).context("could not write to fzf"),
-        }
-    }
-
     pub fn wait(&mut self) -> Result<String> {
         // Drop stdin to prevent deadlock.
         mem::drop(self.0.stdin.take());
